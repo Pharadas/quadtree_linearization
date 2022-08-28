@@ -314,34 +314,34 @@ impl QuadTree {
 // TODO     - Debe ser lo mas branchless posible
 
 pub fn get_quad_tree_from_linear(mut quad: QuadTree, linearized_tree: &Vec<bool>, mut d: u32, c: Color, bloque_lleno: bool, mut index: usize, mut curr_quad: i32) -> () {
-    let curr_depth = d + 1;
+    // let curr_depth = d + 1;
 
-    while curr_depth > d {
-        if linearized_tree[index] { // Significa que no hay nada dentro del quad que estamos checando en este momento
-            index += 1;
-            curr_quad += 1;
+    // while curr_depth > d {
+    //     if linearized_tree[index] { // Significa que no hay nada dentro del quad que estamos checando en este momento
+    //         index += 1;
+    //         curr_quad += 1;
 
-        } else {
-            if linearized_tree[index] && !linearized_tree[index + 1] { // Si hay algo pero no esta lleno, bajar un nivel mas
-                quad.create_sub_quad(curr_quad, c);
-                quad.get_quad_from_num(curr_quad);
+    //     } else {
+    //         if linearized_tree[index] && !linearized_tree[index + 1] { // Si hay algo pero no esta lleno, bajar un nivel mas
+    //             quad.create_sub_quad(curr_quad, c);
+    //             quad.get_quad_from_num(curr_quad);
 
-            } else if linearized_tree[index] && linearized_tree[index + 1] { // Si esta completamente lleno bajar hasta el punto mas bajo y colorear todo
-                index += 2;
-                let mut val = 0;
-                // Leer los siguientes n bits (por ahora esta hardcoded para 2), convertirlos a un indice y buscar el feature en la lista COLORS
-                // TODO hacer esto para n bits
-                if linearized_tree[index] {
-                    val += 1;
-                } 
-                if linearized_tree[index + 1] {
-                    val += 2;
-                }
+    //         } else if linearized_tree[index] && linearized_tree[index + 1] { // Si esta completamente lleno bajar hasta el punto mas bajo y colorear todo
+    //             index += 2;
+    //             let mut val = 0;
+    //             // Leer los siguientes n bits (por ahora esta hardcoded para 2), convertirlos a un indice y buscar el feature en la lista COLORS
+    //             // TODO hacer esto para n bits
+    //             if linearized_tree[index] {
+    //                 val += 1;
+    //             } 
+    //             if linearized_tree[index + 1] {
+    //                 val += 2;
+    //             }
 
-                quad.create_sub_quad(curr_quad, COLORS[val]);
-                let depth_quad = quad.get_quad_from_num(curr_quad).as_deref().unwrap();
-                get_quad_tree_from_linear(*depth_quad, linearized_tree, d, c, bloque_lleno, index, curr_quad);
-            }
-        }
-    }
+    //             quad.create_sub_quad(curr_quad, COLORS[val]);
+    //             let depth_quad = quad.get_quad_from_num(curr_quad).as_deref().unwrap();
+    //             get_quad_tree_from_linear(*depth_quad, linearized_tree, d, c, bloque_lleno, index, curr_quad);
+    //         }
+    //     }
+    // }
 }
