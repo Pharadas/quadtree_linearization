@@ -8,11 +8,14 @@ use sdl2::video::Window;
 use sdl2::rect::{Point, Rect};
 use sdl2::pixels::Color;
 
-use bitvec::prelude::*;
-
 const MAX_DEPTH: u32 = 3;
 
-const COLORS: [Color; 4] = [Color::RGB(255, 0, 0), Color::RGB(0, 255, 0), Color::RGB(0, 0, 255), Color::RGB(255, 255, 255)];
+const COLORS: [Color; 4] = [
+    Color::RGB(255, 0, 0),
+    Color::RGB(0, 255, 0),
+    Color::RGB(0, 0, 255),
+    Color::RGB(255, 255, 255)
+];
 
 pub struct QuadTree {
     pub border_ul: TVec2<i32>,
@@ -44,6 +47,7 @@ impl QuadTree {
             ).unwrap();
         }
 
+        // Disgusting but works for now
         if !self.ul.is_none() {
             if self.depth == MAX_DEPTH - 1 {
                 let cosa = self.ul.as_ref().unwrap().color.as_ref().unwrap();
@@ -157,6 +161,7 @@ impl QuadTree {
         (linearized_quad_string, all_equal)
     }
 
+    // TODO: checar que deberia regresar esta funcion para que se pueda usar en mas situaciones
     pub fn get_quad_from_num(&self, num: i32) -> &Option<Box<QuadTree>> {
         match num {
             1 => {&self.ul}
@@ -194,6 +199,7 @@ impl QuadTree {
         if self.depth < MAX_DEPTH {
             let quad = self.get_quad_at_pos(x, y);
 
+            // TODO: reescribirla
             match quad {
                 1 => {
                     if !self.ul.is_none() {
@@ -307,41 +313,173 @@ impl QuadTree {
         }
     }
 
+    fn fill_quad(&mut self, mask: usize) {
+        let color = COLORS[mask];
+        println!("filling shit");
+
+        if self.depth < MAX_DEPTH {
+            // Si no existe, crear una subdivision y bajar mas
+            if self.ul.is_none() {
+                self.create_sub_quad(1, color);
+            } else {
+                for i in 1..5 {
+                    self.ul.as_mut().unwrap().create_sub_quad(i, color);
+                }
+            }
+            self.ul.as_mut().unwrap().fill_quad(mask);
+
+            // Si no existe, crear una subdivision y bajar mas
+            if self.ur.is_none() {
+                self.create_sub_quad(2, color);
+            } else {
+                for i in 1..5 {
+                    self.ur.as_mut().unwrap().create_sub_quad(i, color);
+                }
+            }
+            self.ur.as_mut().unwrap().fill_quad(mask);
+
+            // Si no existe, crear una subdivision y bajar mas
+            if self.ll.is_none() {
+                self.create_sub_quad(3, color);
+            } else {
+                for i in 1..5 {
+                    self.ll.as_mut().unwrap().create_sub_quad(i, color);
+                }
+            }
+            self.ll.as_mut().unwrap().fill_quad(mask);
+
+            // Si no existe, crear una subdivision y bajar mas
+            if self.lr.is_none() {
+                self.create_sub_quad(4, color);
+            } else {
+                for i in 1..5 {
+                    self.lr.as_mut().unwrap().create_sub_quad(i, color);
+                }
+            }
+            self.lr.as_mut().unwrap().fill_quad(mask);
+
+        } else {
+            // Si ya llegamos al punto mas bajo, solo llenar el quad en el que estamos
+            self.color = Some(color);
+        }
+    }
+
+    fn debug_print_linear_tree_left(tree_vector: &Vec<bool>, index: &usize) {
+        for i in *index..tree_vector.len() {
+            if tree_vector[i] {
+                print!("1");
+            } else {
+                print!("0");
+            }
+        }
+        print!("\n");
+    }
+
+    pub fn get_quadtree_from_linear(&mut self, tree_vector: &Vec<bool>, index: &mut usize) {
+        QuadTree::debug_print_linear_tree_left(tree_vector, index);
+        println!("{}", self.depth);
+
+        // Si ya estamos en el penultimo quad, solo crear los de abajo
+        if self.depth == MAX_DEPTH - 1 {
+
+            // No es bonito, pero tambien tenemos que checar el caso en el que este penultimo
+            // quad este lleno
+            if tree_vector[*index] && tree_vector[*index + 1] {
+                let mut mask: usize = 0;
+                if tree_vector[*index + 1] {
+                    mask += 1;
+                }
+                if tree_vector[*index + 2] {
+                    mask += 2;
+                }
+                *index += 4;
+                self.fill_quad(mask);
+
+            } else if tree_vector[*index] && !tree_vector[*index + 1] {
+                *index += 2;
+
+                for i in 1..5 {
+                    // Solo hacemos algo si el siguiente valor no es 0
+                    if tree_vector[*index] {
+                        // Si si hay algo checamos los siguiente dos valores
+                        let mut mask: usize = 0;
+                        if tree_vector[*index + 1] {
+                            mask += 1;
+                        }
+                        if tree_vector[*index + 2] {
+                            mask += 2;
+                        }
+                        *index += 3;
+
+                        self.create_sub_quad(i, COLORS[mask]);
+                    } else {
+                        *index += 1;
+                    }
+                }
+            } else {
+                *index += 1;
+            }
+
+        } else {
+            if !tree_vector[*index] { // Si sabemos que este es el ultimo quad, solo saltar al siguiente index
+                *index += 1;
+
+            } else {
+                if tree_vector[*index + 1] {
+                    // Si el siguiente tambien es un 1 sabemos que esta lleno
+                    // Solo checar cual es la feature con la que vamos a llenar todo
+                    // TODO: Hacer que este chequeo sea para n bits
+                    let mut mask: usize = 0;
+                    if tree_vector[*index + 2] {
+                        mask += 1;
+                    }
+                    if tree_vector[*index + 3] {
+                        mask += 2;
+                    }
+
+                    self.fill_quad(mask);
+                    *index += 4;
+                } else {
+                    // Ahora sabemos que hay algo pero no es homogeneo hasta abajo,
+                    // hay que seguir bajando
+                    *index += 2;
+
+                    // TODO: refactorizar esto con una macro
+                    if tree_vector[*index] {
+                        self.create_sub_quad(1, Color::RGB(0, 0, 0));
+                        self.ul.as_mut().unwrap().get_quadtree_from_linear(tree_vector, index);
+                    } else {
+                        *index += 1;
+                    }
+
+                    if tree_vector[*index] {
+                        self.create_sub_quad(2, Color::RGB(0, 0, 0));
+                        self.ur.as_mut().unwrap().get_quadtree_from_linear(tree_vector, index);
+                    } else {
+                        *index += 1;
+                    }
+
+                    if tree_vector[*index] {
+                        self.create_sub_quad(3, Color::RGB(0, 0, 0));
+                        self.ll.as_mut().unwrap().get_quadtree_from_linear(tree_vector, index);
+                    } else {
+                        *index += 1;
+                    }
+
+                    if tree_vector[*index] {
+                        self.create_sub_quad(4, Color::RGB(0, 0, 0));
+                        self.lr.as_mut().unwrap().get_quadtree_from_linear(tree_vector, index);
+                    } else {
+                        *index += 1;
+                    }
+
+                }
+            }
+        }
+    }
 }
 
 // TODO hacer que esta funcion sea compatible con la gpu
 // TODO     - No puede usar recursion
 // TODO     - Debe ser lo mas branchless posible
-
-pub fn get_quad_tree_from_linear(mut quad: QuadTree, linearized_tree: &Vec<bool>, mut d: u32, c: Color, bloque_lleno: bool, mut index: usize, mut curr_quad: i32) -> () {
-    // let curr_depth = d + 1;
-
-    // while curr_depth > d {
-    //     if linearized_tree[index] { // Significa que no hay nada dentro del quad que estamos checando en este momento
-    //         index += 1;
-    //         curr_quad += 1;
-
-    //     } else {
-    //         if linearized_tree[index] && !linearized_tree[index + 1] { // Si hay algo pero no esta lleno, bajar un nivel mas
-    //             quad.create_sub_quad(curr_quad, c);
-    //             quad.get_quad_from_num(curr_quad);
-
-    //         } else if linearized_tree[index] && linearized_tree[index + 1] { // Si esta completamente lleno bajar hasta el punto mas bajo y colorear todo
-    //             index += 2;
-    //             let mut val = 0;
-    //             // Leer los siguientes n bits (por ahora esta hardcoded para 2), convertirlos a un indice y buscar el feature en la lista COLORS
-    //             // TODO hacer esto para n bits
-    //             if linearized_tree[index] {
-    //                 val += 1;
-    //             } 
-    //             if linearized_tree[index + 1] {
-    //                 val += 2;
-    //             }
-
-    //             quad.create_sub_quad(curr_quad, COLORS[val]);
-    //             let depth_quad = quad.get_quad_from_num(curr_quad).as_deref().unwrap();
-    //             get_quad_tree_from_linear(*depth_quad, linearized_tree, d, c, bloque_lleno, index, curr_quad);
-    //         }
-    //     }
-    // }
-}
+pub fn traverse_linear_quad_tree() {}
